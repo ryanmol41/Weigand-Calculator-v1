@@ -92,7 +92,7 @@ const hexToBitsExact = (hex, width) => {
 
 const decToBitsExact = (dec, width) => {
   const d = normalizeDec(dec)
-  if (!/^[0-9]+$/.test(d)) throw new Error('Invalid decimal.')
+  if (!/^\d+$/.test(d)) throw new Error('Invalid decimal.')
   const v = BigInt(d)
   if (v > maxForBits(width)) throw new Error(`Decimal exceeds ${width}-bit range.`)
   return v.toString(2).padStart(width, '0')
@@ -276,8 +276,15 @@ export default function App() {
   }, [fmt])
 
   const result = useMemo(() => {
-    let originalFrame = ''
-    let originDesc = ''
+    try {
+      let originalFrame = ''
+      let originDesc = ''
+      // ... all your existing computation stays exactly as-is ...
+      return { error: null, originDesc, originalFrame, origParsed, flippedFrame, flippedParsed, validInvertedFrame, validInvertedParsed }
+    } catch (e) {
+      return { error: e.message || String(e) }
+    }
+  }, [tab, fc, cn, frameBaseHex, frameVal, payloadBaseHex, payloadVal, reparity, fmt, showFC, supportsParity])
 
     if (tab === 'fc_cn') {
       const fcNum = showFC ? parseInt(fc || '0', 10) : 0
