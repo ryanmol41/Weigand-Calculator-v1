@@ -279,65 +279,55 @@ export default function App() {
     try {
       let originalFrame = ''
       let originDesc = ''
-      // ... all your existing computation stays exactly as-is ...
+
+      if (tab === 'fc_cn') {
+        const fcNum = showFC ? parseInt(fc || '0', 10) : 0
+        const cnNum = parseInt(cn || '0', 10)
+        if (Number.isNaN(fcNum) || Number.isNaN(cnNum)) throw new Error('Inputs must be integers.')
+        if (showFC && (fcNum < 0 || fcNum >= (1 << fmt.fcBits))) throw new Error(`Facility code must be 0..${(1 << fmt.fcBits) - 1}.`)
+        if (cnNum < 0) throw new Error('Card number must be >= 0.')
+        originalFrame = buildFrameFromFC_CN(fmt, fcNum, cnNum)
+        originDesc = showFC ? `from FC=${fcNum}, CN=${cnNum}` : `from CN=${cnNum}`
+      }
+
+      if (tab === 'frame') {
+        originalFrame = frameBaseHex ? hexToBitsExact(frameVal, fmt.totalBits) : decToBitsExact(frameVal, fmt.totalBits)
+        const p = parseFrame(fmt, originalFrame)
+        originDesc = showFC
+          ? `from ${frameBaseHex ? 'hex' : 'decimal'} frame (parsed FC=${p.fc}, CN=${p.cn}${supportsParity ? `, P1=${p.p1_ok ? 'OK' : 'BAD'}, P2=${p.p2_ok ? 'OK' : 'BAD'}` : ''})`
+          : `from ${frameBaseHex ? 'hex' : 'decimal'} frame (parsed CN=${p.cn}${supportsParity ? `, P1=${p.p1_ok ? 'OK' : 'BAD'}, P2=${p.p2_ok ? 'OK' : 'BAD'}` : ''})`
+      }
+
+      if (tab === 'payload') {
+        const dataWidth = fmt.fcBits + fmt.cnBits
+        const dataBits = payloadBaseHex ? hexToBitsExact(payloadVal, dataWidth) : decToBitsExact(payloadVal, dataWidth)
+        originalFrame = buildFrameFromPayloadBits(fmt, dataBits)
+        const fcNum = showFC ? parseInt(dataBits.slice(0, fmt.fcBits), 2) : undefined
+        const cnNum = parseInt(dataBits.slice(fmt.fcBits), 2)
+        originDesc = showFC
+          ? `from ${payloadBaseHex ? 'hex' : 'decimal'} payload (FC=${fcNum}, CN=${cnNum})`
+          : `from ${payloadBaseHex ? 'hex' : 'decimal'} payload (CN=${cnNum})`
+      }
+
+      const origParsed = parseFrame(fmt, originalFrame)
+      const flippedFrame = invertBits(originalFrame)
+      const flippedParsed = parseFrame(fmt, flippedFrame)
+
+      let validInvertedFrame = null
+      let validInvertedParsed = null
+      if (reparity && supportsParity) {
+        const invertedData = flippedFrame.slice(1, flippedFrame.length - 1)
+        validInvertedFrame = reapplyParityIfSupported(fmt, invertedData, false)
+        validInvertedParsed = parseFrame(fmt, validInvertedFrame)
+      }
+
       return { error: null, originDesc, originalFrame, origParsed, flippedFrame, flippedParsed, validInvertedFrame, validInvertedParsed }
     } catch (e) {
       return { error: e.message || String(e) }
     }
   }, [tab, fc, cn, frameBaseHex, frameVal, payloadBaseHex, payloadVal, reparity, fmt, showFC, supportsParity])
 
-    if (tab === 'fc_cn') {
-      const fcNum = showFC ? parseInt(fc || '0', 10) : 0
-      const cnNum = parseInt(cn || '0', 10)
-      if (Number.isNaN(fcNum) || Number.isNaN(cnNum)) throw new Error('Inputs must be integers.')
-      if (showFC && (fcNum < 0 || fcNum >= (1 << fmt.fcBits))) throw new Error(`Facility code must be 0..${(1 << fmt.fcBits) - 1}.`)
-      if (cnNum < 0) throw new Error('Card number must be >= 0.')
-      originalFrame = buildFrameFromFC_CN(fmt, fcNum, cnNum)
-      originDesc = showFC ? `from FC=${fcNum}, CN=${cnNum}` : `from CN=${cnNum}`
-    }
-
-    if (tab === 'frame') {
-      originalFrame = frameBaseHex ? hexToBitsExact(frameVal, fmt.totalBits) : decToBitsExact(frameVal, fmt.totalBits)
-      const p = parseFrame(fmt, originalFrame)
-      originDesc = showFC
-        ? `from ${frameBaseHex ? 'hex' : 'decimal'} frame (parsed FC=${p.fc}, CN=${p.cn}${supportsParity ? `, P1=${p.p1_ok ? 'OK' : 'BAD'}, P2=${p.p2_ok ? 'OK' : 'BAD'}` : ''})`
-        : `from ${frameBaseHex ? 'hex' : 'decimal'} frame (parsed CN=${p.cn}${supportsParity ? `, P1=${p.p1_ok ? 'OK' : 'BAD'}, P2=${p.p2_ok ? 'OK' : 'BAD'}` : ''})`
-    }
-
-    if (tab === 'payload') {
-      const dataWidth = fmt.fcBits + fmt.cnBits
-      const dataBits = payloadBaseHex ? hexToBitsExact(payloadVal, dataWidth) : decToBitsExact(payloadVal, dataWidth)
-      originalFrame = buildFrameFromPayloadBits(fmt, dataBits)
-      const fcNum = showFC ? parseInt(dataBits.slice(0, fmt.fcBits), 2) : undefined
-      const cnNum = parseInt(dataBits.slice(fmt.fcBits), 2)
-      originDesc = showFC
-        ? `from ${payloadBaseHex ? 'hex' : 'decimal'} payload (FC=${fcNum}, CN=${cnNum})`
-        : `from ${payloadBaseHex ? 'hex' : 'decimal'} payload (CN=${cnNum})`
-    }
-
-    const origParsed = parseFrame(fmt, originalFrame)
-    const flippedFrame = invertBits(originalFrame)
-    const flippedParsed = parseFrame(fmt, flippedFrame)
-
-    let validInvertedFrame = null
-    let validInvertedParsed = null
-    if (reparity && supportsParity) {
-      const invertedData = flippedFrame.slice(1, flippedFrame.length - 1)
-      validInvertedFrame = reapplyParityIfSupported(fmt, invertedData, false)
-      validInvertedParsed = parseFrame(fmt, validInvertedFrame)
-    }
-
-    return { originDesc, originalFrame, origParsed, flippedFrame, flippedParsed, validInvertedFrame, validInvertedParsed }
-  }, [tab, fc, cn, frameBaseHex, frameVal, payloadBaseHex, payloadVal, reparity, fmt, showFC, supportsParity])
-
-  let error = null
-  try {
-    // accessing result computes and may throw
-    void result.originDesc
-  } catch (e) {
-    error = e.message || String(e)
-  }
-
+  const error = result.error
   const safeResult = error ? null : result
 
   return (
