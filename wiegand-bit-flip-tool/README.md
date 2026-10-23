@@ -68,6 +68,6 @@ git init
 git add .
 git commit -m "Initial commit - Wiegand Bit-Flip Tool"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/wiegand-bit-flip-tool.git
+git remote add origin https://github.com/ryanmol41/wiegand-bit-flip-tool.git
 git push -u origin main
 ```
